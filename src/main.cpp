@@ -1,10 +1,8 @@
-#include <iostream>
-#include <raylib.h>
+#include "space.hpp"
 
-using namespace std;
-
-int main(int argc, char const *argv[])
+int main()
 {
-    cout << "Hello new version of conway game in c++ c:" << endl;
-    return 0;
+
+    
+    return Space::run();
 }
