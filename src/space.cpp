@@ -18,28 +18,33 @@ int Space::start()
     viewBuffer = (Cell *)(malloc(sizeof(Cell) * config.width * config.height));
     drawBuffer = (Cell *)(malloc(sizeof(Cell) * config.width * config.height));
 
-    for (size_t y = 1; y < config.height - 1; y++)
-        for (size_t x = 1; x < config.width - 1; x++)
-            viewBuffer[y * config.height + x] = rand() % 4 == 0 ? Cell::Alive : Cell::Dead;
+    reload();
 
     InitWindow(config.screenWidth, config.screenHeight, "Conway Game");
     SetTargetFPS(config.maxFps);
 
-    bool stop = false;
+    bool stop = false, paused = false, mousePointer = false;
 
-    Texture2D alive_t = LoadTexture("assets/alive.png");
-    Texture2D dead_t = LoadTexture("assets/dead.png");
+    std::stringstream s;
+    s << "assets/" << config.alive;
+    Texture2D alive_t = LoadTexture(s.str().c_str());
+    s.str("");
+    s << "assets/" << config.dead;
+    Texture2D dead_t = LoadTexture(s.str().c_str());
 
-    size_t cellSize = 20;
+    s.str("");
+    s << "assets/" << config.backImage;
+    config.back_i = LoadTexture(s.str().c_str());
 
-    float textureSize = 32.0f;
+    config.back_c = GetColor(TextToInteger(config.colorImage.c_str()));
 
-    Vector2 v0 = {0, 0};
+    const float textureSize = 32.0f;
+
+    Vector2 v0 = {0, 0}, centerPos = {(float)config.screenWidth / 2, (float)config.screenHeight / 2}, mousePos;
     Rectangle src = {0, 0, textureSize, textureSize};
 
-    long double delta = 0, acc_s = 0, acc_ds = 0, acc_p = 0;
+    long double delta = 0, acc_s = 0, acc_ds = 0, acc_p = 0, TICK_TIME = 1.0L / config.tps;
     size_t tick, tick_s, fps, tmp = 0, last = Time::getNanoS();
-    ;
 
     while (!stop)
     {
@@ -50,15 +55,26 @@ int Space::start()
         if (delta > 0.25L)
             delta = 0.25L;
 
-        acc_p += delta;
+        if (!paused)
+            acc_p += delta;
 
-        while (acc_p >= TICK_TIME)
+        while (acc_p >= TICK_TIME && !paused)
         {
             process(TICK_TIME);
             acc_p -= TICK_TIME;
 
             tick++;
             tick_s++;
+        }
+
+        mousePos = GetMousePosition();
+        float scrollValue = GetMouseWheelMove();
+
+        if (IsMouseButtonDown(MOUSE_BUTTON_RIGHT))
+        {
+            Vector2 mDelta = GetMouseDelta();
+            pos.x += mDelta.x;
+            pos.y += mDelta.y;
         }
 
         Vector2 direction = {0, 0};
@@ -74,13 +90,78 @@ int Space::start()
         pos.x += direction.x * SPEED * delta;
         pos.y += direction.y * SPEED * delta;
 
+        Vector2 mouse = mousePointer ? mousePos : centerPos;
+        if (scrollValue > 0)
+        {
+            float oldSize = config.cellSize;
+            config.cellSize = std::min(config.cellSize * ZOOM_FACTOR, config.maxSizeCell);
+            float ratio = config.cellSize / oldSize;
+
+            pos.x = mouse.x - (mouse.x - pos.x) * ratio;
+            pos.y = mouse.y - (mouse.y - pos.y) * ratio;
+        }
+
+        else if (scrollValue < 0)
+        {
+            float oldSize = config.cellSize;
+            config.cellSize = std::max(config.cellSize / ZOOM_FACTOR, config.minSizeCell);
+            float ratio = config.cellSize / oldSize;
+
+            pos.x = mouse.x - (mouse.x - pos.x) * ratio;
+            pos.y = mouse.y - (mouse.y - pos.y) * ratio;
+        }
+
+        if (IsKeyPressed(KEY_SPACE))
+            paused = !paused;
+
+        if (IsKeyDown(KEY_LEFT_CONTROL))
+            SPEED = config.speed * config.runFactor;
+        else
+            SPEED = config.speed;
+
+        if (IsKeyPressed(KEY_DOWN))
+        {
+            config.tps = std::max(config.tps / TPS_FACTOR, MIN_TPS);
+            TICK_TIME = 1.0L / config.tps;
+        }
+        if (IsKeyPressed(KEY_UP))
+        {
+            config.tps = std::min(config.tps * TPS_FACTOR, MAX_TPS);
+            TICK_TIME = 1.0L / config.tps;
+        }
+
+        if (IsKeyPressed(KEY_R))
+        {
+            reload();
+        }
+
+        if (IsKeyPressed(KEY_C) && IsKeyDown(KEY_LEFT_CONTROL))
+        {
+            clear();
+        }
+
+        if (IsMouseButtonDown(MOUSE_BUTTON_LEFT))
+        {
+            Vector2 mouse = GetMousePosition();
+
+            int gridX = (int)((mouse.x - pos.x) / config.cellSize);
+            int gridY = (int)((mouse.y - pos.y) / config.cellSize);
+            if (gridX >= 0 && gridX < config.width &&
+                gridY >= 0 && gridY < config.height)
+            {
+                size_t index = gridY * config.width + gridX;
+                viewBuffer[index] = IsKeyDown(KEY_LEFT_SHIFT) ? Cell::Dead : Cell::Alive;
+            }
+        }
+
         if (IsWindowResized())
         {
             config.screenHeight = GetScreenHeight();
             config.screenWidth = GetScreenWidth();
+            centerPos = {(float)config.screenWidth / 2, (float)config.screenHeight / 2};
         }
 
-        render(src, cellSize, v0, alive_t, dead_t);
+        render(src, v0, alive_t, dead_t);
         fps++;
         acc_s += delta;
         if (acc_s >= 1.0L)
@@ -142,11 +223,29 @@ void Space::nextIteration()
     drawBuffer = tmp;
 }
 
-void Space::render(Rectangle src, size_t cellSize, Vector2 v0, Texture2D alive_t, Texture2D dead_t)
+void Space::reload()
+{
+    for (size_t y = 1; y < config.height - 1; y++)
+        for (size_t x = 1; x < config.width - 1; x++)
+            viewBuffer[y * config.height + x] = rand() % 4 == 0 ? Cell::Alive : Cell::Dead;
+}
+
+void Space::clear()
+{
+    for (size_t n = 1; n < config.height * config.width; n++)
+        viewBuffer[n] = Cell::Dead;
+}
+
+void Space::render(Rectangle src, Vector2 v0, Texture2D alive_t, Texture2D dead_t)
 {
     BeginDrawing();
 
-    ClearBackground(BLACK);
+    ClearBackground(config.back_c);
+    if (config.showImage)
+    {
+        DrawTexturePro(config.back_i, {0, 0, (float)config.back_i.width, (float)config.back_i.height},
+                       {0, 0, (float)config.screenWidth, (float)config.screenHeight}, {0, 0}, 0, WHITE);
+    }
 
     size_t h;
     for (size_t y = 0; y < config.height; y++)
@@ -154,8 +253,8 @@ void Space::render(Rectangle src, size_t cellSize, Vector2 v0, Texture2D alive_t
         h = y * config.width;
         for (size_t x = 0; x < config.width; x++)
         {
-            Rectangle tile = {(float)(cellSize * x) + pos.x, (float)(cellSize * y) + pos.y, (float)cellSize, (float)cellSize};
-            if (tile.x > config.screenWidth || tile.y > config.screenHeight || tile.x+cellSize < 0 || tile.y+cellSize < 0)
+            Rectangle tile = {(float)(config.cellSize * x) + pos.x, (float)(config.cellSize * y) + pos.y, config.cellSize, config.cellSize};
+            if (tile.x > config.screenWidth || tile.y > config.screenHeight || tile.x + config.cellSize < 0 || tile.y + config.cellSize < 0)
                 continue;
             DrawTexturePro(viewBuffer[h + x] == Cell::Alive ? alive_t : dead_t,
                            src, tile, v0, 0, WHITE);

@@ -3,24 +3,32 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-
+#include <string>
 #include <cstdint>
 
 #include <raylib.h>
 
-#define _TPS 5.0L
-#define TICK_TIME 1.0L / _TPS
 #define OneBillion 1'000'000'000.0L
 
 #define OK 0
 #define ERROR -1
+
+constexpr float TPS_FACTOR = 1.5f;
+constexpr float ZOOM_FACTOR = 1.2f;
+constexpr float MIN_TPS = 2.0f;
+constexpr float MAX_TPS = 1'000'000.0f;
 
 class Space
 {
 public:
     struct configuration
     {
-        size_t width, height, screenWidth, screenHeight, maxFps, tps;
+        size_t width, height, screenWidth, screenHeight, maxFps, tps, speed;
+        float cellSize, runFactor, minSizeCell, maxSizeCell;
+        std::string alive, dead, backImage, colorImage;
+        Texture2D back_i;
+        Color back_c;
+        bool showImage;
     };
 
 private:
@@ -32,6 +40,8 @@ private:
 
     int start();
     void nextIteration();
+    void reload();
+    void clear();
 
     // possiblement transformer ca en shaders et faire le calcule sur le gpu
     inline uint8_t countNeighbord(size_t x, size_t y)
@@ -49,7 +59,7 @@ private:
                viewBuffer[i + w + 1];
     }
 
-    void render(Rectangle src, size_t cellSize, Vector2 v0, Texture2D alive_t, Texture2D dead_t);
+    void render(Rectangle src, Vector2 v0, Texture2D alive_t, Texture2D dead_t);
     void process(long double delta);
 
     Cell *viewBuffer = nullptr;
@@ -58,7 +68,7 @@ private:
     size_t TPS = 0, FPS = 0;
 
     Vector2 pos;
-    size_t SPEED = 200;
+    size_t SPEED = 0;
 
     struct configuration config;
 
