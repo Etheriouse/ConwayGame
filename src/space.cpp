@@ -11,7 +11,6 @@
 int Space::start()
 {
     config = load();
-    // read config file
 
     srand(time(NULL));
 
@@ -19,7 +18,12 @@ int Space::start()
     drawBuffer = (Cell *)(malloc(sizeof(Cell) * config.width * config.height));
 
     reload();
-
+    if (config.fullscreen)
+        SetConfigFlags(FLAG_FULLSCREEN_MODE);
+    if (config.borderless)
+        SetConfigFlags(FLAG_BORDERLESS_WINDOWED_MODE);
+        
+    SetConfigFlags(FLAG_WINDOW_RESIZABLE);
     InitWindow(config.screenWidth, config.screenHeight, "Conway Game");
     SetTargetFPS(config.maxFps);
 

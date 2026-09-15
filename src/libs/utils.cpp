@@ -32,6 +32,8 @@ struct Space::configuration load()
 
     inipp::get_value(ini.sections["window"], "width", config.screenWidth);
     inipp::get_value(ini.sections["window"], "height", config.screenHeight);
+    inipp::get_value(ini.sections["window"], "fullscreen", config.fullscreen);
+    inipp::get_value(ini.sections["window"], "borderless", config.borderless);
 
     return config;
 }

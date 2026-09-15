@@ -28,7 +28,7 @@ public:
         std::string alive, dead, backImage, colorImage;
         Texture2D back_i;
         Color back_c;
-        bool showImage;
+        bool showImage, fullscreen, borderless;
     };
 
 private:
